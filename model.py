@@ -699,7 +699,7 @@ class MyModel(AIxBlockMLBase):
 
         elif command.lower() == "predict":
             prompt = kwargs.get("prompt", None)
-            model_id = kwargs.get("model_id", "Qwen/Qwen3-1.7B")
+            model_id = kwargs.get("model_id", "Qwen/Qwen2.5-Coder-7B-Instruct")
             text = kwargs.get("text", None)
             token_length = kwargs.get("token_lenght", 30)
             task = kwargs.get("task", "")
