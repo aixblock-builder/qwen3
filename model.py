@@ -316,23 +316,13 @@ class MyModel(AIxBlockMLBase):
             username = ""
             hf_model_name = ""
 
-            # try:
-            #     headers = {"Authorization": f"Bearer {push_to_hub_token}"}
-            #     response = requests.get(
-            #         "https://huggingface.co/api/whoami-v2", headers=headers
-            #     )
-
-            #     if response.status_code == 200:
-            #         data = response.json()
-            #         username = data.get("name")
-            #         hf_model_name = f"{username}/{hf_model_id}"
-            #         print(f"Username: {username}")
-            #     else:
-            #         print(f"Error: {response.status_code} - {response.text}")
-            #         hf_model_name = "Token not correct"
-            # except Exception as e:
-            #     hf_model_name = "Token not correct"
-            #     print(e)
+            try:
+                user = whoami(token=push_to_hub_token)['name']
+                hf_model_name = f"{user}/{hf_model_id}"
+            except Exception as e:
+                hf_model_name = "Token not correct"
+                print(e)
+                
             CHANNEL_STATUS[channel_name] = {
                 "status": "training",
                 "hf_model_id": hf_model_name,
