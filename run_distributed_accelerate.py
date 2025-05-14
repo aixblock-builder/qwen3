@@ -300,6 +300,8 @@ except RuntimeError as e:
         raise
 
 trainer.push_to_hub()
+output_dir = os.path.join("./data/checkpoint", hf_model_id.split("/")[-1])
+trainer.save_model(output_dir)
 
 from huggingface_hub import whoami, ModelCard, ModelCardData, upload_file
 user = whoami(token=push_to_hub_token)['name']
@@ -337,9 +339,6 @@ upload_file(
 
 print("✅ README.md đã được cập nhật.")
 
-
-output_dir = os.path.join("./data/checkpoint", hf_model_id.split("/")[-1])
-trainer.save_model(output_dir)
 # free the memory again
 del model
 del trainer
