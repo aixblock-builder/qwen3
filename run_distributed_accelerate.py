@@ -1,4 +1,5 @@
 import argparse
+from ast import arg
 import json
 import os
 
@@ -20,10 +21,6 @@ from trl import SFTTrainer
 from logging_class import start_queue, write_log
 
 # ---------------------------------------------------------------------------
-# subprocess.run(
-#     "venv/bin/pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu126",
-#     shell=True,
-# )
 HfFolder.save_token("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")
 wandb.login("allow", "cd65e4ccbe4a97f6b8358f78f8ecf054f21466d9")
 os.environ["CUDA_VISIBLE_DEVICES"] = "0,1"
@@ -50,15 +47,23 @@ parser.add_argument(
     help="Name of the dataset to use",
 )
 parser.add_argument(
-    "--prompt_field",
+    "--instruction_field",
     type=str,
     default="prompt",
     help="Field name for prompts in the dataset",
 )
 parser.add_argument(
-    "--text_field", type=str, default="response", help="Field name for text in the dataset"
+    "--input_field",
+    type=str,
+    default="task_description",
+    help="Field name for text in the dataset",
 )
-
+parser.add_argument(
+    "--output_field",
+    type=str,
+    default="response",
+    help="Field name for text in the dataset",
+)
 args = parser.parse_args()
 log_queue, logging_thread = start_queue(args.channel_log)
 write_log(log_queue)
@@ -72,7 +77,7 @@ output_dir = "./data/checkpoint"
 # push_to_hub = True if args.push_to_hub and args.push_to_hub == "True" else False
 push_to_hub = True
 hf_model_id = args.hf_model_id if args.hf_model_id else "aixblock"
-push_to_hub_token = "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"
+push_to_hub_token = args.push_to_hub_token if args.push_to_hub_token else "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"
 
 if args.training_args_json:
     with open(args.training_args_json, "r") as f:
@@ -98,41 +103,26 @@ tokenizer = AutoTokenizer.from_pretrained(
 EOS_TOKEN = tokenizer.eos_token  # Must add EOS_TOKEN
 alpaca_prompt = """Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request.
 
-                ### Prompt:
-                {}
+                    ### Instruction:
+                    {}
 
-                ### Response:
-                {}"""
+                    ### Input:
+                    {}
+
+                    ### Response:
+                    {}"""
 
 
 def formatting_prompts_func(examples):
-    prompt = examples.get(args.prompt_field)
-    response = examples.get(args.text_field)
-    texts = []
-    for input, output in zip(prompt, response):
-        text = alpaca_prompt.format(input, output) + EOS_TOKEN
-        texts.append(text)
-    return tokenizer(
-        texts,
-        truncation=True,
-        padding=True,
-        max_length=128,
-        return_tensors="pt",
-    )
-
-
-
-
-def tokenizer_func(examples):
-    instructions = examples["instruction"]
-    inputs = examples["input"]
-    outputs = examples["output"]
+    instructions = examples.get(args.instruction_field)
+    inputs = examples.get(args.input_field)
+    outputs = examples.get(args.output_field)
     texts = []
     for instruction, input, output in zip(instructions, inputs, outputs):
         text = alpaca_prompt.format(instruction, input, output) + EOS_TOKEN
         texts.append(text)
     return tokenizer(
-        "".join(texts),
+        texts,
         truncation=True,
         padding=True,
         max_length=128,
@@ -310,6 +300,44 @@ except RuntimeError as e:
         raise
 
 trainer.push_to_hub()
+
+from huggingface_hub import whoami, ModelCard, ModelCardData, upload_file
+user = whoami(token=push_to_hub_token)['name']
+repo_id = f"{user}/{hf_model_id}"
+card = ModelCard.load(repo_id)
+sections = card.text.split("## ")
+
+new_sections = []
+for section in sections:
+    if section.lower().startswith("citations"):
+        new_section = (
+            "Citations\n\n"
+            "This model was fine-tuned by **AIxBlock**.\n\n"
+            "It was trained using a proprietary training workflow from **AIxBlock**, "
+            "a project under the ownership of the company.\n\n"
+            "© 2025 AIxBlock. All rights reserved.\n"
+        )
+        new_sections.append(new_section)
+    else:
+        new_sections.append(section)
+
+card.text = "## ".join(new_sections)
+
+readme_path = "README.md"
+with open(readme_path, "w") as f:
+    f.write(card.text)
+
+upload_file(
+    path_or_fileobj=readme_path,
+    path_in_repo="README.md",
+    repo_id=repo_id,
+    token=push_to_hub_token,
+    commit_message="Update citation to AIxBlock format"
+)
+
+print("✅ README.md đã được cập nhật.")
+
+
 output_dir = os.path.join("./data/checkpoint", hf_model_id.split("/")[-1])
 trainer.save_model(output_dir)
 # free the memory again
