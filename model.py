@@ -261,6 +261,7 @@ class MyModel(AIxBlockMLBase):
             hf_model_name = ""
 
             try:
+                from huggingface_hub import whoami
                 user = whoami(token=push_to_hub_token)['name']
                 hf_model_name = f"{user}/{hf_model_id}"
             except Exception as e:
