@@ -315,7 +315,7 @@ for section in sections:
     if section.lower().startswith("citations"):
         new_section = (
             "Citations\n\n"
-            "This model was fine-tuned by **AIxBlock**.\n\n"
+            "This model was fine-tuned on **AIxBlock** platform.\n\n"
             "It was trained using a proprietary training workflow from **AIxBlock**, "
             "a project under the ownership of the company.\n\n"
             "© 2025 AIxBlock. All rights reserved.\n"
