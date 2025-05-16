@@ -19,6 +19,7 @@ from transformers import (
 from trl import SFTTrainer
 
 from logging_class import start_queue, write_log
+from model import CHANNEL_STATUS
 
 # ---------------------------------------------------------------------------
 HfFolder.save_token("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")
@@ -338,6 +339,7 @@ upload_file(
 )
 
 print("✅ README.md đã được cập nhật.")
+CHANNEL_STATUS[hf_model_id]["status"] = "done"
 
 # free the memory again
 del model

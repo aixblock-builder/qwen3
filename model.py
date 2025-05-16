@@ -256,7 +256,7 @@ class MyModel(AIxBlockMLBase):
             output_field = kwargs.get("output_field", "response")
             log_queue, logging_thread = start_queue(channel_log)
             write_log(log_queue)
-            channel_name = f"{hf_model_id}_{str(uuid.uuid4())[:8]}"
+            channel_name = f"{hf_model_id}"
             username = ""
             hf_model_name = ""
 
@@ -568,7 +568,7 @@ class MyModel(AIxBlockMLBase):
                             command,
                             shell=True,
                         )
-                CHANNEL_STATUS[channel_name]["status"] = "done"
+                # CHANNEL_STATUS[channel_name]["status"] = "done"
                 output_dir = "./data/checkpoint"
                 print(push_to_hub)
                 if push_to_hub:
