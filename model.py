@@ -259,6 +259,14 @@ class MyModel(AIxBlockMLBase):
             channel_name = f"{hf_model_id}_{str(uuid.uuid4())[:8]}"
             username = ""
             hf_model_name = ""
+
+            try:
+                user = whoami(token=push_to_hub_token)['name']
+                hf_model_name = f"{user}/{hf_model_id}"
+            except Exception as e:
+                hf_model_name = "Token not correct"
+                print(e)
+                
             CHANNEL_STATUS[channel_name] = {
                 "status": "training",
                 "hf_model_id": hf_model_name,
