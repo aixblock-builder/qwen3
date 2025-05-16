@@ -339,7 +339,6 @@ upload_file(
 )
 
 print("✅ README.md đã được cập nhật.")
-CHANNEL_STATUS[hf_model_id]["status"] = "done"
 
 # free the memory again
 del model

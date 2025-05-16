@@ -568,9 +568,9 @@ class MyModel(AIxBlockMLBase):
                             command,
                             shell=True,
                         )
-                # CHANNEL_STATUS[channel_name]["status"] = "done"
                 output_dir = "./data/checkpoint"
                 print(push_to_hub)
+                CHANNEL_STATUS[channel_name]["status"] = "done"
                 if push_to_hub:
                     import datetime
 
