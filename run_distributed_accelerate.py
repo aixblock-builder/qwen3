@@ -101,6 +101,8 @@ tokenizer = AutoTokenizer.from_pretrained(
     model_name, add_eos_token=True, use_fast=True, trust_remote_code=True
 )
 EOS_TOKEN = tokenizer.eos_token  # Must add EOS_TOKEN
+EOS_TOKEN = tokenizer.eos_token  # Must add EOS_TOKEN
+
 alpaca_prompt = """Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request.
 
                     ### Instruction:
@@ -112,24 +114,49 @@ alpaca_prompt = """Below is an instruction that describes a task, paired with an
                     ### Response:
                     {}"""
 
+alpaca_prompt_without_instruction = """Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request.
+
+                    ### Input:
+                    {}
+
+                    ### Response:
+                    {}"""
+
 
 def formatting_prompts_func(examples):
-    instructions = examples.get(args.instruction_field) or []
+    # Kiểm tra xem field instruction có tồn tại không
+    has_instruction = args.instruction_field in examples
+
+    instructions = examples.get(args.instruction_field) if has_instruction else []
     inputs = examples.get(args.input_field) or []
     outputs = examples.get(args.output_field) or []
+
     texts = []
-    for instruction, input, output in zip(instructions, inputs, outputs):
-        if instruction is None:
-            instruction = ""
-        text = alpaca_prompt.format(instruction, input, output) + EOS_TOKEN
-        texts.append(text)
-    
+    for i in range(len(outputs)):
+        input_text = inputs[i] if i < len(inputs) else ""
+        output_text = outputs[i] if i < len(outputs) else ""
+
+        if has_instruction:
+            instruction_text = instructions[i] if i < len(instructions) else ""
+            prompt = alpaca_prompt.format(
+                instruction_text or "", input_text, output_text
+            )
+        else:
+            prompt = alpaca_prompt_without_instruction.format(
+                input_text, output_text
+            )
+
+        texts.append(prompt + EOS_TOKEN)
+
+    if not texts:
+        return {}
+
     return tokenizer(
         texts,
         truncation=True,
         padding=True,
         max_length=128,
-        # return_tensors="pt",
+        return_tensors="pt",
     )
 
 
@@ -166,6 +193,9 @@ if not is_use_local:
     )  # 20% cho eval
     train_dataset = train_test_split["train"]
     eval_dataset = train_test_split["test"]
+
+    print(train_dataset[0], len(train_dataset))
+    print(eval_dataset[0], len(eval_dataset))
 
     train_dataset = train_dataset.map(
         formatting_prompts_func, remove_columns=train_dataset.column_names, batched=True
