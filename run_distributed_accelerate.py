@@ -123,12 +123,13 @@ def formatting_prompts_func(examples):
             instruction = ""
         text = alpaca_prompt.format(instruction, input, output) + EOS_TOKEN
         texts.append(text)
+    
     return tokenizer(
         texts,
         truncation=True,
         padding=True,
         max_length=128,
-        return_tensors="pt",
+        # return_tensors="pt",
     )
 
 
