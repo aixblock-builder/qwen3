@@ -19,7 +19,6 @@ from transformers import (
 from trl import SFTTrainer
 
 from logging_class import start_queue, write_log
-from model import CHANNEL_STATUS
 
 # ---------------------------------------------------------------------------
 HfFolder.save_token("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")
@@ -70,7 +69,7 @@ log_queue, logging_thread = start_queue(args.channel_log)
 write_log(log_queue)
 dataset_local = args.dataset_local
 is_use_local = False
-num_train_epochs = 1
+num_train_epochs = 10
 per_train_dataset = 0.8
 per_test_dataset = 0.2
 output_dir = "./data/checkpoint"
@@ -144,7 +143,7 @@ if is_use_local:
 
 logger.info(f"Dataset id: {dataset_id}")
 
-num_train_epochs = int(training_args_dict.get("num_train_epochs", 1))
+num_train_epochs = int(training_args_dict.get("num_train_epochs", 10))
 per_train_dataset = float(training_args_dict.get("per_train_dataset", 0.8))
 per_test_dataset = float(training_args_dict.get("per_test_dataset", 0.2))
 
