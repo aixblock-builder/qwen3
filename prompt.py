@@ -91,6 +91,7 @@ def qa_without_context(model, question):
 
         chain = prompt | hf
         result = chain.invoke({"question": question})
+        return result
 
         # Chạy mô hình để trả lời câu hỏi
         # result = qa_no_context_chain.run({"question": question})
