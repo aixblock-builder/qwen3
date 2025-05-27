@@ -114,11 +114,13 @@ alpaca_prompt = """Below is an instruction that describes a task, paired with an
 
 
 def formatting_prompts_func(examples):
-    instructions = examples.get(args.instruction_field)
-    inputs = examples.get(args.input_field)
-    outputs = examples.get(args.output_field)
+    instructions = examples.get(args.instruction_field) or []
+    inputs = examples.get(args.input_field) or []
+    outputs = examples.get(args.output_field) or []
     texts = []
     for instruction, input, output in zip(instructions, inputs, outputs):
+        if instruction is None:
+            instruction = ""
         text = alpaca_prompt.format(instruction, input, output) + EOS_TOKEN
         texts.append(text)
     return tokenizer(
