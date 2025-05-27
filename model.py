@@ -283,7 +283,7 @@ class MyModel(AIxBlockMLBase):
                 checkpoint_version,
                 checkpoint_id,
                 dataset_version,
-                dataset_id,
+                dataset,
                 model_id,
                 world_size,
                 rank,
@@ -296,12 +296,13 @@ class MyModel(AIxBlockMLBase):
                 push_to_hub,
                 push_to_hub_token,
                 host_name,
+                dataset_id
             ):
 
                 dataset_path = None
                 project = connect_project(host_name, token, project_id)
 
-                if dataset_version and dataset_id and project:
+                if dataset_version and dataset and project:
                     dataset_path = os.path.join(
                         clone_dir, f"datasets/{dataset_version}"
                     )
@@ -310,7 +311,7 @@ class MyModel(AIxBlockMLBase):
                         data_path = os.path.join(clone_dir, "data_zip")
                         os.makedirs(data_path, exist_ok=True)
 
-                        dataset_name = download_dataset(project, dataset_id, data_path)
+                        dataset_name = download_dataset(project, dataset, data_path)
                         print(dataset_name)
                         if dataset_name:
                             data_zip_dir = os.path.join(data_path, dataset_name)
@@ -344,7 +345,7 @@ class MyModel(AIxBlockMLBase):
                         if int(rank) == 0:
                             print("master node")
                             command = (
-                                "venv/bin/accelerate launch --num_processes {num_processes} --num_machines {SLURM_NNODES} --machine_rank 0 --main_process_ip {head_node_ip} --main_process_port {port} {file_name} --training_args_json {json_file} --dataset_local {dataset_path} --channel_log {channel_log} --hf_model_id {hf_model_id} --push_to_hub {push_to_hub} --push_to_hub_token {push_to_hub_token} --model_id {model_id} --instruction_field {instruction_field} --input_field {input_field} --output_field {output_field}"
+                                "venv/bin/accelerate launch --num_processes {num_processes} --num_machines {SLURM_NNODES} --machine_rank 0 --main_process_ip {head_node_ip} --main_process_port {port} {file_name} --training_args_json {json_file} --dataset_local {dataset_path} --channel_log {channel_log} --hf_model_id {hf_model_id} --push_to_hub {push_to_hub} --push_to_hub_token {push_to_hub_token} --model_id {model_id} --instruction_field {instruction_field} --input_field {input_field} --output_field {output_field} --dataset_id {dataset_id}"
                             ).format(
                                 num_processes=world_size * torch.cuda.device_count(),
                                 SLURM_NNODES=world_size,
@@ -361,6 +362,7 @@ class MyModel(AIxBlockMLBase):
                                 instruction_field=instruction_field,
                                 input_field=input_field,
                                 output_field=output_field,
+                                dataset_id=dataset_id
                             )
                             process = subprocess.run(
                                 command,
@@ -369,7 +371,7 @@ class MyModel(AIxBlockMLBase):
                         else:
                             print("worker node")
                             command = (
-                                "venv/bin/accelerate launch --num_processes {num_processes} --num_machines {SLURM_NNODES} --machine_rank {machine_rank} --main_process_ip {head_node_ip} --main_process_port {port} {file_name} --training_args_json {json_file} --dataset_local {dataset_path} --channel_log {channel_log} --hf_model_id {hf_model_id} --push_to_hub {push_to_hub} --push_to_hub_token {push_to_hub_token} --model_id {model_id} --instruction_field {instruction_field} --input_field {input_field} --output_field {output_field}"
+                                "venv/bin/accelerate launch --num_processes {num_processes} --num_machines {SLURM_NNODES} --machine_rank {machine_rank} --main_process_ip {head_node_ip} --main_process_port {port} {file_name} --training_args_json {json_file} --dataset_local {dataset_path} --channel_log {channel_log} --hf_model_id {hf_model_id} --push_to_hub {push_to_hub} --push_to_hub_token {push_to_hub_token} --model_id {model_id} --instruction_field {instruction_field} --input_field {input_field} --output_field {output_field} --dataset_id {dataset_id}"
                             ).format(
                                 num_processes=world_size * torch.cuda.device_count(),
                                 SLURM_NNODES=world_size,
@@ -387,6 +389,7 @@ class MyModel(AIxBlockMLBase):
                                 instruction_field=instruction_field,
                                 input_field=input_field,
                                 output_field=output_field,
+                                dataset_id=dataset_id
                             )
                             process = subprocess.run(
                                 command,
@@ -396,7 +399,7 @@ class MyModel(AIxBlockMLBase):
                     else:
                         if torch.cuda.device_count() > 1:  # multi gpu
                             command = (
-                                "venv/bin/accelerate launch --multi_gpu --num_machines {SLURM_NNODES} --machine_rank 0 --num_processes {num_processes} {file_name} --training_args_json {json_file}  --dataset_local {dataset_path} --channel_log {channel_log} --hf_model_id {hf_model_id} --push_to_hub {push_to_hub} --push_to_hub_token {push_to_hub_token} --model_id {model_id} --instruction_field {instruction_field} --input_field {input_field} --output_field {output_field}"
+                                "venv/bin/accelerate launch --multi_gpu --num_machines {SLURM_NNODES} --machine_rank 0 --num_processes {num_processes} {file_name} --training_args_json {json_file}  --dataset_local {dataset_path} --channel_log {channel_log} --hf_model_id {hf_model_id} --push_to_hub {push_to_hub} --push_to_hub_token {push_to_hub_token} --model_id {model_id} --instruction_field {instruction_field} --input_field {input_field} --output_field {output_field} --dataset_id {dataset_id}"
                             ).format(
                                 num_processes=world_size * torch.cuda.device_count(),
                                 SLURM_NNODES=world_size,
@@ -413,6 +416,7 @@ class MyModel(AIxBlockMLBase):
                                 instruction_field=instruction_field,
                                 input_field=input_field,
                                 output_field=output_field,
+                                dataset_id=dataset_id
                             )
                             print("================2")
                             print(command)
@@ -421,7 +425,7 @@ class MyModel(AIxBlockMLBase):
 
                         elif torch.cuda.device_count() == 1:  # one gpu
                             command = (
-                                "venv/bin/accelerate launch {file_name} --training_args_json {json_file}  --dataset_local {dataset_path} --channel_log {channel_log} --hf_model_id {hf_model_id} --push_to_hub {push_to_hub} --push_to_hub_token {push_to_hub_token} --model_id {model_id} --instruction_field {instruction_field} --input_field {input_field} --output_field {output_field}"
+                                "venv/bin/accelerate launch {file_name} --training_args_json {json_file}  --dataset_local {dataset_path} --channel_log {channel_log} --hf_model_id {hf_model_id} --push_to_hub {push_to_hub} --push_to_hub_token {push_to_hub_token} --model_id {model_id} --instruction_field {instruction_field} --input_field {input_field} --output_field {output_field} --dataset_id {dataset_id}"
                             ).format(
                                 file_name="./run_distributed_accelerate.py",
                                 json_file=json_file,
@@ -434,6 +438,7 @@ class MyModel(AIxBlockMLBase):
                                 instruction_field=instruction_field,
                                 input_field=input_field,
                                 output_field=output_field,
+                                dataset_id=dataset_id
                             )
                             print("================")
                             print(command)
@@ -448,7 +453,7 @@ class MyModel(AIxBlockMLBase):
                             process.wait()
                         else:  # no gpu
                             command = (
-                                "venv/bin/accelerate launch --cpu {file_name} --training_args_json {json_file} --dataset_local {dataset_path} --channel_log {channel_log} --hf_model_id {hf_model_id} --push_to_hub {push_to_hub} --push_to_hub_token {push_to_hub_token} --model_id {model_id} --instruction_field {instruction_field} --input_field {input_field} --output_field {output_field}"
+                                "venv/bin/accelerate launch --cpu {file_name} --training_args_json {json_file} --dataset_local {dataset_path} --channel_log {channel_log} --hf_model_id {hf_model_id} --push_to_hub {push_to_hub} --push_to_hub_token {push_to_hub_token} --model_id {model_id} --instruction_field {instruction_field} --input_field {input_field} --output_field {output_field} --dataset_id {dataset_id}"
                             ).format(
                                 file_name="./run_distributed_accelerate.py",
                                 json_file=json_file,
@@ -461,6 +466,7 @@ class MyModel(AIxBlockMLBase):
                                 instruction_field=instruction_field,
                                 input_field=input_field,
                                 output_field=output_field,
+                                dataset_id=dataset_id
                             )
                             process = subprocess.Popen(
                                 command,
@@ -488,7 +494,7 @@ class MyModel(AIxBlockMLBase):
                             print("master node")
                             command = (
                                 "venv/bin/torchrun --nnodes {nnodes} --node_rank {node_rank} --nproc_per_node {nproc_per_node} "
-                                "--master_addr {master_addr} --master_port {master_port} {file_name} --training_args_json {json_file} --dataset_local {dataset_path} --channel_log {channel_log} --hf_model_id {hf_model_id} --push_to_hub {push_to_hub} --push_to_hub_token {push_to_hub_token} --model_id {model_id} --instruction_field {instruction_field} --input_field {input_field} --output_field {output_field}"
+                                "--master_addr {master_addr} --master_port {master_port} {file_name} --training_args_json {json_file} --dataset_local {dataset_path} --channel_log {channel_log} --hf_model_id {hf_model_id} --push_to_hub {push_to_hub} --push_to_hub_token {push_to_hub_token} --model_id {model_id} --instruction_field {instruction_field} --input_field {input_field} --output_field {output_field} --dataset_id {dataset_id}"
                             ).format(
                                 nnodes=int(world_size),
                                 node_rank=int(rank),
@@ -506,6 +512,7 @@ class MyModel(AIxBlockMLBase):
                                 instruction_field=instruction_field,
                                 input_field=input_field,
                                 output_field=output_field,
+                                dataset_id=dataset_id
                             )
                             process = subprocess.Popen(
                                 command,
@@ -518,7 +525,7 @@ class MyModel(AIxBlockMLBase):
                             print("worker node")
                             command = (
                                 "venv/bin/torchrun --nnodes {nnodes} --node_rank {node_rank} --nproc_per_node {nproc_per_node} "
-                                "--master_addr {master_addr} --master_port {master_port} {file_name} --training_args_json {json_file} --dataset_local {dataset_path} --channel_log {channel_log} --hf_model_id {hf_model_id} --push_to_hub {push_to_hub} --push_to_hub_token {push_to_hub_token} --model_id {model_id} --instruction_field {instruction_field} --input_field {input_field} --output_field {output_field}"
+                                "--master_addr {master_addr} --master_port {master_port} {file_name} --training_args_json {json_file} --dataset_local {dataset_path} --channel_log {channel_log} --hf_model_id {hf_model_id} --push_to_hub {push_to_hub} --push_to_hub_token {push_to_hub_token} --model_id {model_id} --instruction_field {instruction_field} --input_field {input_field} --output_field {output_field} --dataset_id {dataset_id}"
                             ).format(
                                 nnodes=int(world_size),
                                 node_rank=int(rank),
@@ -536,6 +543,7 @@ class MyModel(AIxBlockMLBase):
                                 instruction_field=instruction_field,
                                 input_field=input_field,
                                 output_field=output_field,
+                                dataset_id=dataset_id
                             )
                             print(command)
                             process = subprocess.Popen(
@@ -548,7 +556,7 @@ class MyModel(AIxBlockMLBase):
                     else:
                         command = (
                             "venv/bin/torchrun --nnodes {nnodes} --node_rank {node_rank} --nproc_per_node {nproc_per_node} "
-                            "{file_name} --training_args_json {json_file} --dataset_local {dataset_path} --channel_log {channel_log} --hf_model_id {hf_model_id} --push_to_hub {push_to_hub} --push_to_hub_token {push_to_hub_token} --model_id {model_id} --instruction_field {instruction_field} --input_field {input_field} --output_field {output_field}"
+                            "{file_name} --training_args_json {json_file} --dataset_local {dataset_path} --channel_log {channel_log} --hf_model_id {hf_model_id} --push_to_hub {push_to_hub} --push_to_hub_token {push_to_hub_token} --model_id {model_id} --instruction_field {instruction_field} --input_field {input_field} --output_field {output_field} --dataset_id {dataset_id}"
                         ).format(
                             nnodes=int(world_size),
                             node_rank=int(rank),
@@ -564,6 +572,7 @@ class MyModel(AIxBlockMLBase):
                             instruction_field=instruction_field,
                             input_field=input_field,
                             output_field=output_field,
+                            dataset_id=dataset_id
                         )
                         process = subprocess.run(
                             command,
@@ -592,7 +601,7 @@ class MyModel(AIxBlockMLBase):
                     checkpoint_version,
                     checkpoint_id,
                     dataset_version,
-                    dataset_id,
+                    dataset,
                     model_id,
                     world_size,
                     rank,
@@ -605,6 +614,7 @@ class MyModel(AIxBlockMLBase):
                     push_to_hub,
                     push_to_hub_token,
                     host_name,
+                    dataset_id
                 ),
             )
             train_thread.start()

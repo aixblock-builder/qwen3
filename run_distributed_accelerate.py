@@ -142,6 +142,7 @@ is_use_local = dataset_local is not None and dataset_local != "None"
 if is_use_local:
     dataset_id = dataset_local
 
+logger.info(f"Dataset id: {dataset_id}")
 
 num_train_epochs = int(training_args_dict.get("num_train_epochs", 1))
 per_train_dataset = float(training_args_dict.get("per_train_dataset", 0.8))
