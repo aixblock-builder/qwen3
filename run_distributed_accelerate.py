@@ -69,7 +69,7 @@ log_queue, logging_thread = start_queue(args.channel_log)
 write_log(log_queue)
 dataset_local = args.dataset_local
 is_use_local = False
-num_train_epochs = 5
+num_train_epochs = 10
 per_train_dataset = 0.8
 per_test_dataset = 0.2
 output_dir = "./data/checkpoint"
@@ -156,7 +156,7 @@ if is_use_local:
 
 logger.info(f"Dataset id: {dataset_id}")
 
-num_train_epochs = int(training_args_dict.get("num_train_epochs", 5))
+num_train_epochs = int(training_args_dict.get("num_train_epochs", 10))
 per_train_dataset = float(training_args_dict.get("per_train_dataset", 0.8))
 per_test_dataset = float(training_args_dict.get("per_test_dataset", 0.2))
 
@@ -239,6 +239,12 @@ peft_config = LoraConfig(
     target_modules="all-linear",
 )
 
+try:
+    eval_step = len(train_dataset)
+except Exception as e:
+    print(e)
+    eval_step = 50
+
 training_arguments = TrainingArguments(
     output_dir="./data/checkpoint",
     eval_strategy="steps",
@@ -253,7 +259,7 @@ training_arguments = TrainingArguments(
     learning_rate=1e-4,
     # fp16 = not torch.cuda.is_bf16_supported(),
     # bf16 = torch.cuda.is_bf16_supported(),
-    eval_steps=30,
+    eval_steps=eval_step,
     num_train_epochs=num_train_epochs,
     warmup_ratio=0.1,
     lr_scheduler_type="linear",
