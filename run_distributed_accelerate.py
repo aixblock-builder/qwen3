@@ -114,33 +114,27 @@ alpaca_prompt = """Below is an instruction that describes a task, paired with an
 
 
 def formatting_prompts_func(examples):
-    # Nếu không có cột instruction, gán giá trị mặc định ""
-    if "instruction" in examples:
-        instructions = examples.get("instruction") or []
-    else:
-        instructions = [""] * len(examples["input"])
-
-    inputs = examples.get("input") or []
-    outputs = examples.get("output") or []
+    column_names = list(examples.keys())
     texts = []
-    
-    for instruction, input_text, output in zip(instructions, inputs, outputs):
-        if instruction is None:
-            instruction = ""
-        if input_text is None:
-            input_text = ""
-        if output is None:
-            output = ""
-        text = alpaca_prompt.format(instruction, input_text, output) + EOS_TOKEN
+    for i in range(len(examples[column_names[0]])):
+        text_parts = []
+        for key in column_names:
+            value = examples[key][i]
+            if value is None:
+                value = ""
+            text_parts.append(f"{key.capitalize()}: {value}")
+        text = "\n".join(text_parts) + EOS_TOKEN
         texts.append(text)
 
-    return tokenizer(
+    tokenized = tokenizer(
         texts,
         truncation=True,
-        padding=True,
+        padding="max_length",
         max_length=128,
         return_tensors="pt",
     )
+
+    return tokenized
 
 
 if not training_args_dict:
