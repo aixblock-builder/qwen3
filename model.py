@@ -156,8 +156,8 @@ from transformers import (
 
 from function_ml import connect_project, download_dataset, upload_checkpoint
 from logging_class import start_queue, write_log
-from prompt import qa_without_context
-import gc
+# from prompt import qa_without_context
+# import gc
 
 # ------------------------------------------------------------------------------
 hf_token = os.getenv("HF_TOKEN", "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")
@@ -188,6 +188,7 @@ tokenizer_demo = None
 model_loaded_demo = False
 # Parameters for model deployment
 pipe_prediction = None
+tokenizer = None
 
 
 class MyModel(AIxBlockMLBase):
@@ -673,7 +674,7 @@ class MyModel(AIxBlockMLBase):
                 local_dir="./data/checkpoint",
                 task="text-generation",
             ):
-                global pipe_prediction
+                global pipe_prediction, tokenizer
 
                 if pipe_prediction == None:
                     try:
@@ -691,6 +692,7 @@ class MyModel(AIxBlockMLBase):
                         print(f"☁️ Loading model from HuggingFace Hub: {model_id}")
                         model_source = model_id
 
+                    tokenizer = AutoTokenizer.from_pretrained(model_source)
                     if torch.cuda.is_available():
                         if torch.cuda.is_bf16_supported():
                             dtype = torch.bfloat16
@@ -698,28 +700,55 @@ class MyModel(AIxBlockMLBase):
                             dtype = torch.float16
 
                         print("Using CUDA.")
-                        pipe_prediction = pipeline(
-                            task,
-                            model=model_source,
+
+                        model_name = "./data/checkpoint/qwen3-n8n"
+
+                        # load the tokenizer and the model
+                        pipe_prediction = AutoModelForCausalLM.from_pretrained(
+                            model_name,
                             torch_dtype=dtype,
-                            device_map="auto",
-                            token=token,
-                            max_new_tokens=256,
+                            device_map="auto"
                         )
                     else:
                         print("Using CPU.")
-                        pipe_prediction = pipeline(
-                            task,
-                            model=model_source,
+                        pipe_prediction = AutoModelForCausalLM.from_pretrained(
+                            model_name,
+                            torch_dtype=dtype,
                             device_map="cpu",
-                            token=token,
-                            max_new_tokens=256,
                         )
 
             with torch.no_grad():
                 # Load the model
                 smart_pipeline(model_id, hf_access_token)
-                generated_text = qa_without_context(pipe_prediction, prompt)
+                # generated_text = qa_without_context(pipe_prediction, prompt)
+                messages = [
+                    {"role": "user", "content": prompt}
+                ]
+                text = tokenizer.apply_chat_template(
+                    messages,
+                    tokenize=False,
+                    add_generation_prompt=True,
+                    enable_thinking=True # Switches between thinking and non-thinking modes. Default is True.
+                )
+                model_inputs = tokenizer([text], return_tensors="pt").to(pipe_prediction.device)
+
+                # conduct text completion
+                generated_ids = pipe_prediction.generate(
+                    **model_inputs,
+                    max_new_tokens=32768
+                )
+                output_ids = generated_ids[0][len(model_inputs.input_ids[0]):].tolist() 
+
+                # parsing thinking content
+                try:
+                    # rindex finding 151668 (</think>)
+                    index = len(output_ids) - output_ids[::-1].index(151668)
+                except ValueError:
+                    index = 0
+
+                thinking_content = tokenizer.decode(output_ids[:index], skip_special_tokens=True).strip("\n")
+                generated_text = tokenizer.decode(output_ids[index:], skip_special_tokens=True).strip("\n")
+
 
             print(generated_text)
             predictions.append(
@@ -729,7 +758,10 @@ class MyModel(AIxBlockMLBase):
                             "from_name": "generated_text",
                             "to_name": "text_output",
                             "type": "textarea",
-                            "value": {"text": [generated_text]},
+                            "value": {
+                                "thinking": [thinking_content], 
+                                "text": [generated_text]
+                            },
                         }
                     ],
                     "model_version": "",
