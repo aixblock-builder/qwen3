@@ -223,7 +223,14 @@ class MyModel(AIxBlockMLBase):
             framework = kwargs.get("framework", "huggingface")
             task = kwargs.get("task", "text-generation")
             prompt = kwargs.get("prompt", "")
-            trainingArguments = kwargs.get("TrainingArguments", None)
+            trainingArguments = kwargs.get("TrainingArguments", {
+                "dataset_id": dataset_id,
+                "model_id": model_id,
+                "num_train_epochs": 5,
+                "batch_size": 1,
+                "per_train_dataset": 0.8,
+                "per_test_dataset": 0.2
+            })
             cuda_debug = kwargs.get("cuda_debug", False)
 
             json_file = "training_args.json"
@@ -231,6 +238,7 @@ class MyModel(AIxBlockMLBase):
 
             with open(absolute_path, "w") as f:
                 json.dump(trainingArguments, f)
+                
             logger.info(f"Training arguments: {trainingArguments}")
 
             if cuda_debug == True:
@@ -701,18 +709,16 @@ class MyModel(AIxBlockMLBase):
 
                         print("Using CUDA.")
 
-                        model_name = "./data/checkpoint/qwen3-n8n"
-
                         # load the tokenizer and the model
                         pipe_prediction = AutoModelForCausalLM.from_pretrained(
-                            model_name,
+                            model_source,
                             torch_dtype=dtype,
                             device_map="auto"
                         )
                     else:
                         print("Using CPU.")
                         pipe_prediction = AutoModelForCausalLM.from_pretrained(
-                            model_name,
+                            model_source,
                             torch_dtype=dtype,
                             device_map="cpu",
                         )
