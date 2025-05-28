@@ -980,22 +980,22 @@ class MyModel(AIxBlockMLBase):
             with gr.Row():
                 with gr.Column(scale=1):
                     load_btn = gr.Button("Load Model")
-                    with gr.Accordion("Advanced Options", open=False):
-                        temperature = gr.Slider(
-                            label="Temperature", minimum=0.0, maximum=100.0, step=0.1, value=0.9
-                        )
-                        top_p = gr.Slider(
-                            label="Top_p", minimum=0.0, maximum=1.0, step=0.1, value=0.6
-                        )
-                        top_k = gr.Slider(
-                            label="Top_k", minimum=0, maximum=100, step=1, value=0
-                        )
-                        max_new_token = gr.Slider(
-                            label="Max new tokens", minimum=1, maximum=1024, step=1, value=256
-                        )
                 with gr.Column(scale=1):
                     status_text = gr.Textbox(label="Model Status", interactive=False)
 
+            with gr.Accordion("Advanced Options", open=False):
+                temperature = gr.Slider(
+                    label="Temperature", minimum=0.0, maximum=100.0, step=0.1, value=0.9
+                )
+                top_p = gr.Slider(
+                    label="Top_p", minimum=0.0, maximum=1.0, step=0.1, value=0.6
+                )
+                top_k = gr.Slider(
+                    label="Top_k", minimum=0, maximum=100, step=1, value=0
+                )
+                max_new_token = gr.Slider(
+                    label="Max new tokens", minimum=1, maximum=1024, step=1, value=256
+                )
             load_btn.click(fn=lambda: load_model(model_id_demo, temperature.value, top_p, top_k, max_new_token), outputs=status_text)
     
             chat_interface.render()
