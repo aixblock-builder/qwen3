@@ -72,7 +72,7 @@ is_use_local = False
 num_train_epochs = 10
 per_train_dataset = 0.8
 per_test_dataset = 0.2
-
+batch_size = 1
 # push_to_hub = True if args.push_to_hub and args.push_to_hub == "True" else False
 push_to_hub = True
 hf_model_id = args.hf_model_id if args.hf_model_id else "aixblock"
@@ -143,7 +143,7 @@ if not training_args_dict:
     training_args_dict = {}
 
 dataset_id = args.dataset_id
-dataset_id = training_args_dict.get("dataset_id", dataset_id)
+# dataset_id = training_args_dict.get("dataset_id", dataset_id)
 
 
 is_use_local = dataset_local is not None and dataset_local != "None"
@@ -151,11 +151,18 @@ if is_use_local:
     dataset_id = dataset_local
 
 logger.info(f"Dataset id: {dataset_id}")
+logger.info(f"Training args dict: {training_args_dict}")
 
 num_train_epochs = int(training_args_dict.get("num_train_epochs", 10))
+batch_size = int(training_args_dict.get("batch_size", 1))
 per_train_dataset = float(training_args_dict.get("per_train_dataset", 0.8))
 per_test_dataset = float(training_args_dict.get("per_test_dataset", 0.2))
 
+
+logger.info(f"Batch size: {batch_size}")
+logger.info(f"Number of epochs: {num_train_epochs}")
+logger.info(f"Per train dataset: {per_train_dataset}")
+logger.info(f"Per test dataset: {per_test_dataset}")
 # sfttrainer_args = {}
 
 
@@ -236,19 +243,22 @@ peft_config = LoraConfig(
 )
 
 try:
-    eval_step = len(train_dataset)
+    import math
+    eval_step = math.ceil(len(train_dataset) / batch_size)
 except Exception as e:
     print(e)
     eval_step = 50
+
+logger.info(f"Eval steps: {eval_step}")
 
 training_arguments = TrainingArguments(
     output_dir=output_dir,
     eval_strategy="steps",
     do_eval=True,
     # optim="paged_adamw_8bit",
-    per_device_train_batch_size=1,
+    per_device_train_batch_size=batch_size,
     # gradient_accumulation_steps=4,
-    per_device_eval_batch_size=1,
+    per_device_eval_batch_size=batch_size,
     log_level="debug",
     save_strategy="epoch",
     logging_steps=10,
