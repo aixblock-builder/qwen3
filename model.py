@@ -157,7 +157,7 @@ from transformers import (
 from function_ml import connect_project, download_dataset, upload_checkpoint
 from logging_class import start_queue, write_log
 # from prompt import qa_without_context
-# import gc
+import gc
 
 # ------------------------------------------------------------------------------
 hf_token = os.getenv("HF_TOKEN", "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")
@@ -189,6 +189,7 @@ model_loaded_demo = False
 # Parameters for model deployment
 pipe_prediction = None
 tokenizer = None
+model_predict
 
 
 class MyModel(AIxBlockMLBase):
@@ -687,9 +688,12 @@ class MyModel(AIxBlockMLBase):
                 local_dir="./data/checkpoint",
                 task="text-generation",
             ):
-                global pipe_prediction, tokenizer
+                global pipe_prediction, tokenizer, model_predict
+                model_predict = model_id
 
                 if pipe_prediction == None:
+                    gc.collect()
+                    torch.cuda.empty_cache()
                     try:
                         model_name = model_id.split("/")[-1]
                         local_model_dir = os.path.join(local_dir, model_name)
@@ -728,9 +732,12 @@ class MyModel(AIxBlockMLBase):
                             device_map="cpu",
                         )
 
+            print(pipe_prediction, model_id)
             with torch.no_grad():
                 # Load the model
-                smart_pipeline(model_id, hf_access_token)
+                if not pipe_prediction or model_predict != model_id:
+                    smart_pipeline(model_id, hf_access_token)
+
                 # generated_text = qa_without_context(pipe_prediction, prompt)
                 messages = [
                     {"role": "user", "content": prompt}
@@ -780,6 +787,7 @@ class MyModel(AIxBlockMLBase):
             )
 
             return {"message": "predict completed successfully", "result": predictions}
+
         elif command.lower() == "prompt_sample":
             task = kwargs.get("task", "")
             if task == "question-answering":
