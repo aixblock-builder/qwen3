@@ -665,8 +665,9 @@ class MyModel(AIxBlockMLBase):
             top_p = kwargs.get("top_p", 0.95)
             raw_input = kwargs.get("input", None)
             
-            input_datas = json.loads(raw_input)
-            print(input_datas)
+            if raw_input:
+                input_datas = json.loads(raw_input)
+                print(input_datas)
 
             predictions = []
 
