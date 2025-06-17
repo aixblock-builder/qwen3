@@ -175,10 +175,21 @@ if __name__ == "__main__":
     available_port = find_available_port()
     print(f"Starting server on port {available_port}")
 
-    uvicorn.run(
-        app,
-        host="0.0.0.0",
-        port=available_port,
-        ssl_keyfile="ssl/key.pem",
-        ssl_certfile="ssl/cert.pem",
-    )
+    # uvicorn.run(
+    #     app,
+    #     host="0.0.0.0",
+    #     port=available_port,
+    #     ssl_keyfile="ssl/key.pem",
+    #     ssl_certfile="ssl/cert.pem",
+    # )
+    cmd = [
+        sys.executable, "-m", "uvicorn",
+        "main:app",  # đổi "main" nếu file của bạn tên khác
+        "--host", "0.0.0.0",
+        "--port", str(available_port),
+        "--workers", "4",
+        "--ssl-keyfile", "ssl/key.pem",
+        "--ssl-certfile", "ssl/cert.pem"
+    ]
+
+    subprocess.run(cmd)
