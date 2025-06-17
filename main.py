@@ -156,6 +156,8 @@ async def handle_sse(request: Request):
 if __name__ == "__main__":
     import socket
     import ssl
+    import sys
+    import subprocess
 
     import uvicorn
 
