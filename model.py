@@ -158,6 +158,7 @@ from function_ml import connect_project, download_dataset, upload_checkpoint
 from logging_class import start_queue, write_log
 # from prompt import qa_without_context
 import gc
+from model_docchat import docchat_answer
 
 # ------------------------------------------------------------------------------
 hf_token = os.getenv("HF_TOKEN", "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")
@@ -665,6 +666,8 @@ class MyModel(AIxBlockMLBase):
             top_k = kwargs.get("top_k", 50)
             top_p = kwargs.get("top_p", 0.95)
             raw_input = kwargs.get("input", None)
+            docchat_mode = kwargs.get("docchat", False)
+            doc_files = kwargs.get("doc_files", None)
             
             if raw_input:
                 input_datas = json.loads(raw_input)
@@ -674,6 +677,32 @@ class MyModel(AIxBlockMLBase):
 
             if not prompt or prompt == "":
                 prompt = text
+
+            # --- DOCCHAT INTEGRATION ---
+            if docchat_mode or doc_files:
+                # doc_files should be a list of file paths
+                if not doc_files:
+                    doc_files = []
+                if isinstance(doc_files, str):
+                    # If passed as a comma-separated string
+                    doc_files = [f.strip() for f in doc_files.split(",") if f.strip()]
+                answer, verification = docchat_answer(prompt, doc_files)
+                predictions.append({
+                    "result": [
+                        {
+                            "from_name": "generated_text",
+                            "to_name": "text_output",
+                            "type": "textarea",
+                            "value": {
+                                "text": [answer],
+                                "verification": [verification]
+                            },
+                        }
+                    ],
+                    "model_version": "docchat"
+                })
+                return {"message": "predict completed successfully (docchat)", "result": predictions}
+            # --- END DOCCHAT ---
 
             from huggingface_hub import login
 
@@ -1033,3 +1062,56 @@ class MyModel(AIxBlockMLBase):
         file_path = request.args.get("path")
         print(request.args)
         return send_from_directory(os.getcwd(), file_path)
+
+    @mcp.tool()
+    def model_docchat(self, **kwargs):
+        import gradio as gr
+        import hashlib
+        from config import constants
+        from qwen3.model_docchat import docchat_answer
+        import os
+
+        css = """
+        .title { font-size: 1.5em !important; text-align: center !important; color: #FFD700; }
+        .subtitle { font-size: 1em !important; text-align: center !important; color: #FFD700; }
+        .text { text-align: center; }
+        """
+
+        with gr.Blocks(css=css, title="Qwen3 DocChat 🐥") as demo:
+            gr.Markdown("## Qwen3 DocChat: Document Q&A with Fact Verification", elem_classes="subtitle")
+            gr.Markdown("# How it works ✨:", elem_classes="title")
+            gr.Markdown("📤 Upload your document(s), enter your query then hit Submit 📝", elem_classes="text")
+            gr.Markdown("⚠️ **Note:** Only accepts: .pdf, .docx, .txt, .md", elem_classes="text")
+
+            with gr.Row():
+                with gr.Column():
+                    files = gr.Files(label="📄 Upload Documents", file_types=constants.ALLOWED_TYPES)
+                    question = gr.Textbox(label="❓ Question", lines=3)
+                    submit_btn = gr.Button("Submit 🚀")
+                with gr.Column():
+                    answer_output = gr.Textbox(label="🐥 Answer", interactive=False)
+                    verification_output = gr.Textbox(label="✅ Verification Report", interactive=False)
+
+            def process_docchat(question_text, uploaded_files):
+                if not question_text or not question_text.strip():
+                    return "❌ Question cannot be empty", ""
+                if not uploaded_files:
+                    return "❌ No documents uploaded", ""
+                file_paths = [f.name for f in uploaded_files if hasattr(f, 'name') and os.path.exists(f.name)]
+                answer, verification = docchat_answer(question_text, file_paths)
+                return answer, verification
+
+            submit_btn.click(
+                fn=process_docchat,
+                inputs=[question, files],
+                outputs=[answer_output, verification_output]
+            )
+
+        gradio_app, local_url, share_url = demo.launch(
+            share=True,
+            quiet=True,
+            prevent_thread_lock=True,
+            server_name="0.0.0.0",
+            show_error=True,
+        )
+        return {"share_url": share_url, "local_url": local_url}
