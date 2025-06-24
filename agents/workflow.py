@@ -18,10 +18,10 @@ class AgentState(TypedDict):
     retriever: EnsembleRetriever
 
 class AgentWorkflow:
-    def __init__(self):
-        self.researcher = ResearchAgent()
-        self.verifier = VerificationAgent()
-        self.relevance_checker = RelevanceChecker()
+    def __init__(self, model_name_or_path="Qwen/Qwen3-1.7B"):
+        self.researcher = ResearchAgent(model_name_or_path=model_name_or_path)
+        self.verifier = VerificationAgent(model_name_or_path=model_name_or_path)
+        self.relevance_checker = RelevanceChecker(model_name_or_path=model_name_or_path)
         self.compiled_workflow = self.build_workflow()  # Compile once during initialization
         
     def build_workflow(self):
@@ -56,10 +56,16 @@ class AgentWorkflow:
     
     def _check_relevance_step(self, state: AgentState) -> Dict:
         retriever = state["retriever"]
+        question = state["question"].lower()
+        
+        # For summary/summarize requests, always proceed if there are documents
+        if any(word in question for word in ["summary", "summarize", "summarise", "tóm tắt"]):
+            return {"is_relevant": True}
+        
         classification = self.relevance_checker.check(
             question=state["question"], 
             retriever=retriever, 
-            k=1
+            k=3  # Increase k for better coverage
         )
 
         if classification == "CAN_ANSWER":

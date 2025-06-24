@@ -9,14 +9,18 @@ import logging
 logger = logging.getLogger(__name__)
 
 class ResearchAgent:
-    def __init__(self):
+    def __init__(self, model_name_or_path="Qwen/Qwen3-1.7B"):
         """Initialize the research agent with the OpenAI model."""
-        self.llm = QwenLLM()
+        self.llm = QwenLLM(model_name_or_path=model_name_or_path)
         self.prompt_template = (
-            "Answer the following question based on the provided context. Be precise and factual.\n"
-            "Question: {question}\n"
-            "Context:\n{context}\n"
-            "If the context is insufficient, respond with: 'I cannot answer this question based on the provided documents.'"
+            "You are a helpful assistant. Answer the question based on the provided context.\n\n"
+            "Instructions:\n"
+            "- For summary requests: Provide a comprehensive summary of the main points\n"
+            "- For specific questions: Answer precisely using the context\n"
+            "- Be factual and use information from the context\n\n"
+            "Question: {question}\n\n"
+            "Context:\n{context}\n\n"
+            "Answer:"
         )
         
     def generate(self, question: str, documents: List[Document]) -> Dict:
@@ -25,9 +29,9 @@ class ResearchAgent:
         
         prompt = self.prompt_template.format(question=question, context=context)
         try:
-            answer = self.llm.generate(prompt)
+            answer = self.llm.generate(prompt, max_new_tokens=512, temperature=0.7)
             logger.info(f"Generated answer: {answer}")
-            logger.info(f"Context used: {context}")
+            logger.info(f"Context used: {context[:500]}...")  # Limit context logging
         except Exception as e:
             logger.error(f"Error generating answer: {e}")
             raise

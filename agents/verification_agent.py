@@ -10,8 +10,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 class VerificationAgent:
-    def __init__(self):
-        self.llm = QwenLLM()
+    def __init__(self, model_name_or_path="Qwen/Qwen3-1.7B"):
+        self.llm = QwenLLM(model_name_or_path=model_name_or_path)
         self.prompt_template = (
             "Verify the following answer against the provided context. Check for:\n"
             "1. Direct factual support (YES/NO)\n"
