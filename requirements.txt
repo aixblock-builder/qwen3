@@ -50,3 +50,11 @@ torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu126
 spaces
 chromadb==0.6.3
 rank_bm25
+docling==2.16.0
+docling-core==2.15.1
+docling-ibm-models==3.3.0
+docling-parse==3.1.2
+langgraph==0.2.67
+langgraph-checkpoint==2.0.10
+langgraph-sdk==0.1.51
+sentence-transformers==3.2.1
