@@ -4,12 +4,26 @@ from langchain_community.retrievers import BM25Retriever
 from langchain.retrievers import EnsembleRetriever
 from config.settings import settings
 import logging
+import gc
+import torch
 
 logger = logging.getLogger(__name__)
 
 class RetrieverBuilder:
     def __init__(self):
         """Initialize the retriever builder with embeddings."""
+        if hasattr(self, "embeddings"):
+            try:
+                del self.embeddings
+            except:
+                pass
+
+        gc.collect()
+        if torch.backends.mps.is_available():
+            torch.mps.empty_cache()
+        elif torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            
         self.embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
         
     def build_hybrid_retriever(self, docs):

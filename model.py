@@ -166,7 +166,7 @@ HfFolder.save_token(hf_token)
 
 
 hf_access_token = "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"
-login(token=hf_access_token)
+# login(token=hf_access_token)
 CUDA_VISIBLE_DEVICES = []
 for i in range(torch.cuda.device_count()):
     CUDA_VISIBLE_DEVICES.append(i)
@@ -190,7 +190,7 @@ model_loaded_demo = False
 # Parameters for model deployment
 pipe_prediction = None
 tokenizer = None
-model_predict
+model_predict = None
 
 
 class MyModel(AIxBlockMLBase):
@@ -709,7 +709,7 @@ class MyModel(AIxBlockMLBase):
             hf_access_token = kwargs.get(
                 "hf_access_token", "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"
             )
-            login(token=hf_access_token)
+            # login(token=hf_access_token)
 
             def smart_pipeline(
                 model_id: str,
@@ -901,7 +901,7 @@ class MyModel(AIxBlockMLBase):
         hf_access_token = kwargs.get(
             "hf_access_token", "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"
         )
-        login(token=hf_access_token)
+        # login(token=hf_access_token)
         MAX_INPUT_TOKEN_LENGTH = int(os.getenv("MAX_INPUT_TOKEN_LENGTH", "4096"))
 
         DESCRIPTION = """\
@@ -1068,7 +1068,7 @@ class MyModel(AIxBlockMLBase):
         import gradio as gr
         import hashlib
         from config import constants
-        from qwen3.model_docchat import docchat_answer
+        from model_docchat import docchat_answer
         import os
 
         css = """

@@ -7,7 +7,7 @@ from utils.logging import logger
 
 # This function will be used by Qwen3 for docchat prediction and UI
 
-def docchat_answer(question: str, file_paths: List[str]) -> Tuple[str, str]:
+def docchat_answer(question: str, file_paths: List[str], model_name_or_path="Qwen/Qwen3-1.7B") -> Tuple[str, str]:
     """
     Process the given files and question using the DocChat pipeline.
     Returns (answer, verification_report).
@@ -32,7 +32,12 @@ def docchat_answer(question: str, file_paths: List[str]) -> Tuple[str, str]:
 
     try:
         chunks = processor.process(files)
+        print(f"chunks: {chunks}")
+
         retriever = retriever_builder.build_hybrid_retriever(chunks)
+        print(f"retriever: {retriever}")
+        print(f"question: {question}")
+
         result = workflow.full_pipeline(question=question, retriever=retriever)
         return result["draft_answer"], result["verification_report"]
     except Exception as e:

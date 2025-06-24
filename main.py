@@ -1,7 +1,9 @@
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List, Union
+import requests
+from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 from mcp.server.sse import SseServerTransport
@@ -53,17 +55,63 @@ model = MyModel()
 class ActionRequest(BaseModel):
     command: str
     params: Dict[str, Any]
+    doc_file_urls: Optional[Union[str, List[str]]] = None
 
 
 @app.post("/action")
-async def action(request: ActionRequest):
+async def action(request: ActionRequest = Body(...)):
     try:
-        print(request.command, request.params)
-        result = model.action(request.command, **request.params)
+        parsed_params = request.params
+
+        # Normalize URL list
+        doc_file_urls = request.doc_file_urls
+        if isinstance(doc_file_urls, str):
+            doc_file_urls = [doc_file_urls]
+
+        if doc_file_urls:
+            # Convert URLs to list of temp file paths
+            file_paths = fetch_file_paths_from_urls_sync(doc_file_urls)
+            parsed_params["doc_files"] = file_paths
+            parsed_params["docchat"] = True
+
+        result = model.action(request.command, **parsed_params)
         return result
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+def fetch_file_paths_from_urls_sync(urls: List[str], save_dir: str = "downloads") -> List[str]:
+    file_paths = []
+
+    # Tạo thư mục nếu chưa tồn tại
+    Path(save_dir).mkdir(parents=True, exist_ok=True)
+
+    for url in urls:
+        try:
+            response = requests.get(url)
+            response.raise_for_status()
+
+            filename = url.split("/")[-1] or "file"
+            suffix = os.path.splitext(filename)[-1] or ".pdf"
+
+            # Đảm bảo tên file không trùng lặp
+            save_path = Path(save_dir) / filename
+            counter = 1
+            while save_path.exists():
+                save_path = Path(save_dir) / f"{Path(filename).stem}_{counter}{suffix}"
+                counter += 1
+
+            # Ghi nội dung vào file
+            with open(save_path, "wb") as f:
+                f.write(response.content)
+
+            file_paths.append(str(save_path))
+
+        except Exception as e:
+            print(f"❌ Failed to download {url}: {e}")
+            continue
+
+    return file_paths
 
 @app.get("/")
 async def model_endpoint(data: Optional[Dict[str, Any]] = None):
@@ -189,7 +237,7 @@ if __name__ == "__main__":
         "main:app",  # đổi "main" nếu file của bạn tên khác
         "--host", "0.0.0.0",
         "--port", str(available_port),
-        "--workers", "4",
+        "--workers", "1",
         "--ssl-keyfile", "ssl/key.pem",
         "--ssl-certfile", "ssl/cert.pem"
     ]
