@@ -671,6 +671,8 @@ class MyModel(AIxBlockMLBase):
             raw_input = kwargs.get("input", None)
             docchat_mode = kwargs.get("docchat", False)
             doc_files = kwargs.get("doc_files", None)
+            conversation_history = kwargs.get("conversation_history", [])
+            session_id = kwargs.get("session_id", None)
             hf_access_token = kwargs.get("push_to_hub_token", "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")
 
             login(token=hf_access_token)
@@ -692,7 +694,19 @@ class MyModel(AIxBlockMLBase):
                 if isinstance(doc_files, str):
                     # If passed as a comma-separated string
                     doc_files = [f.strip() for f in doc_files.split(",") if f.strip()]
-                answer, verification = docchat_answer(prompt, doc_files)
+                
+                # Add conversation history to the prompt if available
+                enhanced_prompt = prompt
+                if conversation_history:
+                    from utils.chat_history import ChatHistoryManager
+                    history_manager = ChatHistoryManager()
+                    history_context = history_manager.format_history_for_context(conversation_history, max_turns=3)
+                    enhanced_prompt = f"{history_context}\n\nCurrent Question: {prompt}"
+                    print(f"🔄 Using conversation history for session {session_id}")
+                
+                # answer, verification = "test", "test"
+                
+                answer, verification = docchat_answer(enhanced_prompt, doc_files)
                 predictions.append({
                     "result": [
                         {
@@ -756,7 +770,7 @@ class MyModel(AIxBlockMLBase):
                         print("Using CPU.")
                         pipe_prediction = AutoModelForCausalLM.from_pretrained(
                             model_source,
-                            torch_dtype=dtype,
+                            # torch_dtype=dtype,
                             device_map="cpu",
                         )
 
@@ -766,10 +780,21 @@ class MyModel(AIxBlockMLBase):
                 if not pipe_prediction or model_predict != model_id:
                     smart_pipeline(model_id, hf_access_token)
 
-                # generated_text = qa_without_context(pipe_prediction, prompt)
-                messages = [
-                    {"role": "user", "content": prompt}
-                ]
+                # Prepare messages with conversation history
+                messages = []
+                
+                # Add conversation history if available
+                if conversation_history:
+                    print(f"🔄 Adding conversation history to messages for session {session_id}")
+                    for turn in conversation_history[-3:]:  # Use last 3 turns
+                        user_msg = turn.get('user_message', '')
+                        bot_response = turn.get('bot_response', '')
+                        if user_msg and bot_response:
+                            messages.append({"role": "user", "content": user_msg})
+                            messages.append({"role": "assistant", "content": bot_response})
+                
+                # Add current user message
+                messages.append({"role": "user", "content": prompt})
                 text = tokenizer.apply_chat_template(
                     messages,
                     tokenize=False,

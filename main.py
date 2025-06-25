@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from starlette.routing import Mount
 
 from model import MyModel, mcp
+from utils.chat_history import ChatHistoryManager
 
 
 # Models for request validation
@@ -50,18 +51,33 @@ PUSH_GATEWAY_URL = os.getenv("PUSH_GATEWAY_URL", "http://207.246.109.178:9091")
 JOB_INTERVAL = int(os.getenv("JOB_INTERVAL", 60))
 
 model = MyModel()
+chat_history = ChatHistoryManager()
 
 
 class ActionRequest(BaseModel):
     command: str
     params: Dict[str, Any]
     doc_file_urls: Optional[Union[str, List[str]]] = None
+    session_id: Optional[str] = None
+    use_history: Optional[bool] = True
 
 
 @app.post("/action")
 async def action(request: ActionRequest = Body(...)):
     try:
         parsed_params = request.params
+
+        # Handle session management
+        session_id = request.session_id
+        if not session_id:
+            session_id = chat_history.create_new_session()
+            print(f"🆕 Created new session: {session_id}")
+
+        # Get conversation history if enabled and for predict command
+        conversation_history = []
+        if request.use_history and request.command.lower() == "predict":
+            conversation_history = chat_history.get_session_history(session_id, limit=5)
+            print(f"📚 Retrieved {len(conversation_history)} history turns for session {session_id}")
 
         # Normalize URL list
         doc_file_urls = request.doc_file_urls
@@ -74,7 +90,39 @@ async def action(request: ActionRequest = Body(...)):
             parsed_params["doc_files"] = file_paths
             parsed_params["docchat"] = True
 
+        # Add history context for predict commands
+        if request.command.lower() == "predict" and conversation_history:
+            parsed_params["conversation_history"] = conversation_history
+            parsed_params["session_id"] = session_id
+
         result = model.action(request.command, **parsed_params)
+        
+        # Save conversation to history if it's a predict command
+        if request.command.lower() == "predict" and "result" in result:
+            user_prompt = parsed_params.get("prompt", parsed_params.get("text", ""))
+            bot_response = ""
+            
+            # Extract bot response from result
+            if isinstance(result.get("result"), list) and len(result["result"]) > 0:
+                first_result = result["result"][0]
+                if "result" in first_result and len(first_result["result"]) > 0:
+                    value = first_result["result"][0].get("value", {})
+                    if "text" in value and isinstance(value["text"], list):
+                        bot_response = value["text"][0] if value["text"] else ""
+            
+            print(bot_response)
+            if user_prompt and bot_response:
+                doc_files_used = parsed_params.get("doc_files", [])
+                chat_history.save_conversation_turn(
+                    session_id=session_id,
+                    user_message=user_prompt,
+                    bot_response=bot_response,
+                    doc_files=doc_files_used,
+                    metadata={"command": request.command}
+                )
+
+        # Add session_id to response
+        result["session_id"] = session_id
         return result
 
     except Exception as e:
@@ -112,6 +160,70 @@ def fetch_file_paths_from_urls_sync(urls: List[str], save_dir: str = "downloads"
             continue
 
     return file_paths
+
+
+# Chat History Management Endpoints
+@app.get("/chat/sessions/new")
+async def create_new_session():
+    """Create a new chat session"""
+    session_id = chat_history.create_new_session()
+    return {"session_id": session_id, "message": "New session created"}
+
+
+@app.get("/chat/sessions")
+async def get_all_sessions(limit: int = 50):
+    """Get list of all chat sessions with metadata"""
+    try:
+        sessions = chat_history.get_all_sessions(limit)
+        return {
+            "sessions": sessions,
+            "count": len(sessions),
+            "limit": limit
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/chat/sessions/{session_id}/history")
+async def get_session_history(session_id: str, limit: int = 10):
+    """Get conversation history for a session"""
+    try:
+        history = chat_history.get_session_history(session_id, limit)
+        return {
+            "session_id": session_id,
+            "history": history,
+            "count": len(history)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/chat/sessions/{session_id}")
+async def delete_session(session_id: str):
+    """Delete a chat session and all its history"""
+    try:
+        success = chat_history.delete_session(session_id)
+        if success:
+            return {"message": f"Session {session_id} deleted successfully"}
+        else:
+            return {"message": f"Session {session_id} not found or already empty"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/chat/search")
+async def search_conversations(query: str, session_id: Optional[str] = None, n_results: int = 5):
+    """Search for similar conversations"""
+    try:
+        results = chat_history.search_similar_conversations(query, session_id, n_results)
+        return {
+            "query": query,
+            "results": results,
+            "count": len(results)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/")
 async def model_endpoint(data: Optional[Dict[str, Any]] = None):
