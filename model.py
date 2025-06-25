@@ -668,7 +668,7 @@ class MyModel(AIxBlockMLBase):
             raw_input = kwargs.get("input", None)
             docchat_mode = kwargs.get("docchat", False)
             doc_files = kwargs.get("doc_files", None)
-            hf_access_token = kwargs.get("hf_access_token", "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")
+            hf_access_token = kwargs.get("push_to_hub_token", "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")
 
             login(token=hf_access_token)
             
