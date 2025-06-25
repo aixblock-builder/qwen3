@@ -222,6 +222,9 @@ class MyModel(AIxBlockMLBase):
             push_to_hub_token = kwargs.get(
                 "push_to_hub_token", "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"
             )
+
+            login(token=push_to_hub_token)
+            
             framework = kwargs.get("framework", "huggingface")
             task = kwargs.get("task", "text-generation")
             prompt = kwargs.get("prompt", "")
