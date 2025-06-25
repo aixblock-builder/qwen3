@@ -51,7 +51,7 @@ PUSH_GATEWAY_URL = os.getenv("PUSH_GATEWAY_URL", "http://207.246.109.178:9091")
 JOB_INTERVAL = int(os.getenv("JOB_INTERVAL", 60))
 
 model = MyModel()
-chat_history = ChatHistoryManager()
+chat_history = ChatHistoryManager(persist_directory="./chroma_db_history")
 
 
 class ActionRequest(BaseModel):
@@ -69,9 +69,11 @@ async def action(request: ActionRequest = Body(...)):
 
         # Handle session management
         session_id = request.session_id
+        print(f"session_id: {session_id}")
         if not session_id:
-            session_id = chat_history.create_new_session()
-            print(f"🆕 Created new session: {session_id}")
+            session_result = chat_history.create_new_session()
+            session_id = session_result["session_id"]
+            print(f"🆕 Created new session: {session_id} with title: {session_result['title']}")
 
         # Get conversation history if enabled and for predict command
         conversation_history = []
@@ -162,35 +164,56 @@ def fetch_file_paths_from_urls_sync(urls: List[str], save_dir: str = "downloads"
     return file_paths
 
 
-# Chat History Management Endpoints
-@app.get("/chat/sessions/new")
-async def create_new_session():
-    """Create a new chat session"""
-    session_id = chat_history.create_new_session()
-    return {"session_id": session_id, "message": "New session created"}
+# V2 Collections API Endpoints
+@app.post("/v2/collections")
+async def create_new_collection(title: Optional[str] = None):
+    """Create a new chat collection (session)"""
+    try:
+        session_result = chat_history.create_new_session(title)
+        return {
+            "id": session_result["session_id"],
+            "title": session_result["title"], 
+            "message": "New collection created"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/chat/sessions")
-async def get_all_sessions(limit: int = 50):
-    """Get list of all chat sessions with metadata"""
+@app.get("/v2/collections")
+async def get_all_collections(limit: int = 50):
+    """Get list of all chat collections (sessions) with metadata"""
     try:
         sessions = chat_history.get_all_sessions(limit)
+        # Convert sessions to collections format
+        collections = []
+        for session in sessions:
+            collections.append({
+                "id": session["session_id"],
+                "title": session.get("title", "Untitled Collection"),
+                "turn_count": session["turn_count"],
+                "first_message": session["first_message"],
+                "last_message": session["last_message"],
+                "created_at": session["created_at"],
+                "updated_at": session["updated_at"],
+                "doc_files_used": list(session["doc_files_used"])
+            })
+        
         return {
-            "sessions": sessions,
-            "count": len(sessions),
+            "collections": collections,
+            "count": len(collections),
             "limit": limit
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/chat/sessions/{session_id}/history")
-async def get_session_history(session_id: str, limit: int = 10):
-    """Get conversation history for a session"""
+@app.get("/v2/collections/{collection_id}")
+async def get_collection_history(collection_id: str, limit: int = 10):
+    """Get conversation history for a collection (session)"""
     try:
-        history = chat_history.get_session_history(session_id, limit)
+        history = chat_history.get_session_history(collection_id, limit)
         return {
-            "session_id": session_id,
+            "id": collection_id,
             "history": history,
             "count": len(history)
         }
@@ -198,24 +221,24 @@ async def get_session_history(session_id: str, limit: int = 10):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.delete("/chat/sessions/{session_id}")
-async def delete_session(session_id: str):
-    """Delete a chat session and all its history"""
+@app.delete("/v2/collections/{collection_id}")
+async def delete_collection(collection_id: str):
+    """Delete a chat collection (session) and all its history"""
     try:
-        success = chat_history.delete_session(session_id)
+        success = chat_history.delete_session(collection_id)
         if success:
-            return {"message": f"Session {session_id} deleted successfully"}
+            return {"message": f"Collection {collection_id} deleted successfully"}
         else:
-            return {"message": f"Session {session_id} not found or already empty"}
+            return {"message": f"Collection {collection_id} not found or already empty"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/chat/search")
-async def search_conversations(query: str, session_id: Optional[str] = None, n_results: int = 5):
-    """Search for similar conversations"""
+@app.post("/v2/collections/search")
+async def search_collections(query: str, collection_id: Optional[str] = None, n_results: int = 5):
+    """Search for similar conversations across collections"""
     try:
-        results = chat_history.search_similar_conversations(query, session_id, n_results)
+        results = chat_history.search_similar_conversations(query, collection_id, n_results)
         return {
             "query": query,
             "results": results,

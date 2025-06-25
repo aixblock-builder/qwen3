@@ -673,7 +673,29 @@ class MyModel(AIxBlockMLBase):
             doc_files = kwargs.get("doc_files", None)
             conversation_history = kwargs.get("conversation_history", [])
             session_id = kwargs.get("session_id", None)
+            use_history = kwargs.get("use_history", True)
             hf_access_token = kwargs.get("push_to_hub_token", "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")
+
+            # 🧠 CHAT HISTORY MANAGEMENT
+            from utils.chat_history import ChatHistoryManager
+            chat_history = ChatHistoryManager(persist_directory="./chroma_db_history")
+            
+            # Auto-create session if not provided
+            if not session_id:
+                session_result = chat_history.create_new_session()
+                session_id = session_result["session_id"]
+                print(f"🆕 Created new session: {session_id} with title: {session_result['title']}")
+            
+            # Load conversation history if enabled
+            if use_history and not conversation_history:  # Only load if not already provided
+                conversation_history = chat_history.get_session_history(session_id, limit=5)
+                if conversation_history:
+                    print(f"📚 Loaded {len(conversation_history)} previous conversations for session {session_id}")
+                else:
+                    print(f"📝 Starting new conversation for session {session_id}")
+            
+            # Store original prompt for saving later
+            original_prompt = prompt or text
 
             login(token=hf_access_token)
             
@@ -698,9 +720,7 @@ class MyModel(AIxBlockMLBase):
                 # Add conversation history to the prompt if available
                 enhanced_prompt = prompt
                 if conversation_history:
-                    from utils.chat_history import ChatHistoryManager
-                    history_manager = ChatHistoryManager()
-                    history_context = history_manager.format_history_for_context(conversation_history, max_turns=3)
+                    history_context = chat_history.format_history_for_context(conversation_history, max_turns=3)
                     enhanced_prompt = f"{history_context}\n\nCurrent Question: {prompt}"
                     print(f"🔄 Using conversation history for session {session_id}")
                 
@@ -721,7 +741,22 @@ class MyModel(AIxBlockMLBase):
                     ],
                     "model_version": "docchat"
                 })
-                return {"message": "predict completed successfully (docchat)", "result": predictions}
+                
+                # 💾 Save conversation to history (DocChat mode)
+                if use_history and original_prompt and answer:
+                    try:
+                        chat_history.save_conversation_turn(
+                            session_id=session_id,
+                            user_message=original_prompt,
+                            bot_response=answer,
+                            doc_files=doc_files,
+                            metadata={"command": "predict", "mode": "docchat", "model_id": model_id}
+                        )
+                        print(f"💾 Saved DocChat conversation to session {session_id}")
+                    except Exception as e:
+                        print(f"❌ Failed to save DocChat conversation: {e}")
+                
+                return {"message": "predict completed successfully (docchat)", "result": predictions, "session_id": session_id}
             # --- END DOCCHAT ---
 
             def smart_pipeline(
@@ -839,7 +874,21 @@ class MyModel(AIxBlockMLBase):
                 }
             )
 
-            return {"message": "predict completed successfully", "result": predictions}
+            # 💾 Save conversation to history (Normal mode)
+            if use_history and original_prompt and generated_text:
+                try:
+                    chat_history.save_conversation_turn(
+                        session_id=session_id,
+                        user_message=original_prompt,
+                        bot_response=generated_text,
+                        doc_files=doc_files,
+                        metadata={"command": "predict", "mode": "normal", "model_id": model_id, "thinking": thinking_content}
+                    )
+                    print(f"💾 Saved normal conversation to session {session_id}")
+                except Exception as e:
+                    print(f"❌ Failed to save normal conversation: {e}")
+
+            return {"message": "predict completed successfully", "result": predictions, "session_id": session_id}
 
         elif command.lower() == "prompt_sample":
             task = kwargs.get("task", "")

@@ -6,12 +6,22 @@ from typing import List, Dict, Optional, Any
 from chromadb.config import Settings
 
 class ChatHistoryManager:
-    def __init__(self, persist_directory="./chroma_db"):
+    def __init__(self, persist_directory="./chroma_db_history"):
         """Initialize ChatHistoryManager with ChromaDB"""
-        self.client = chromadb.PersistentClient(
-            path=persist_directory,
-            settings=Settings(allow_reset=True, anonymized_telemetry=False)
-        )
+        try:
+            self.client = chromadb.PersistentClient(
+                path=persist_directory,
+                settings=Settings(
+                    allow_reset=True, 
+                    anonymized_telemetry=False,
+                    is_persistent=True
+                )
+            )
+        except Exception as e:
+            print(f"⚠️ ChromaDB client creation failed, retrying: {e}")
+            # If client creation fails, try with minimal settings
+            self.client = chromadb.PersistentClient(path=persist_directory)
+        
         self.collection_name = "chat_history"
         self._init_collection()
     
@@ -19,12 +29,26 @@ class ChatHistoryManager:
         """Initialize or get the chat history collection"""
         try:
             self.collection = self.client.get_collection(self.collection_name)
-        except:
-            # Create collection if it doesn't exist
-            self.collection = self.client.create_collection(
-                name=self.collection_name,
-                metadata={"description": "Chat conversation history storage"}
-            )
+            print(f"📚 Connected to existing chat history collection")
+        except Exception as e:
+            try:
+                # Create collection if it doesn't exist
+                self.collection = self.client.create_collection(
+                    name=self.collection_name,
+                    metadata={"description": "Chat conversation history storage"}
+                )
+                print(f"🆕 Created new chat history collection")
+            except Exception as create_error:
+                print(f"❌ Failed to create collection: {create_error}")
+                # Last resort: try to get or create with minimal settings
+                try:
+                    self.collection = self.client.get_or_create_collection(
+                        name=self.collection_name
+                    )
+                    print(f"🔄 Using get_or_create_collection as fallback")
+                except Exception as final_error:
+                    print(f"💥 Complete ChromaDB failure: {final_error}")
+                    raise
     
     def save_conversation_turn(self, session_id: str, user_message: str, 
                               bot_response: str, doc_files: List[str] = None, 
@@ -192,9 +216,55 @@ class ChatHistoryManager:
         
         return "\n\n--- Previous Conversation ---\n" + "\n\n".join(formatted_turns) + "\n--- End Previous Conversation ---\n"
     
-    def create_new_session(self) -> str:
-        """Create a new session ID"""
-        return str(uuid.uuid4())
+    def create_new_session(self, title: str = None) -> Dict[str, str]:
+        """
+        Create a new session with optional title
+        
+        Args:
+            title: Optional title for the session
+            
+        Returns:
+            Dict with session_id and title
+        """
+        session_id = str(uuid.uuid4())
+        session_title = title or f"Chat Session {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+        
+        # Save session metadata as a special conversation turn
+        try:
+            session_metadata = {
+                "session_id": session_id,
+                "turn_id": f"session_meta_{session_id}",
+                "user_message": f"SESSION_CREATED: {session_title}",
+                "bot_response": "Session initialized",
+                "timestamp": datetime.now().isoformat(),
+                "doc_files": json.dumps([]),
+                "metadata": json.dumps({
+                    "is_session_metadata": True,
+                    "session_title": session_title,
+                    "created_at": datetime.now().isoformat()
+                })
+            }
+            
+            self.collection.add(
+                documents=[f"Session: {session_title}"],
+                metadatas=[session_metadata],
+                ids=[f"session_meta_{session_id}"]
+            )
+            print(f"🆕 Created session {session_id} with title: {session_title}")
+            
+        except Exception as e:
+            print(f"⚠️ Failed to save session metadata: {e}")
+        
+        return {"session_id": session_id, "title": session_title}
+    
+    def close_client(self):
+        """Close ChromaDB client safely"""
+        try:
+            if hasattr(self, 'client'):
+                del self.client
+            print("🔐 ChromaDB client closed successfully")
+        except Exception as e:
+            print(f"⚠️ Error closing ChromaDB client: {e}")
     
     def get_all_sessions(self, limit: int = 100) -> List[Dict]:
         """
@@ -223,8 +293,18 @@ class ChatHistoryManager:
                     continue
                 
                 if session_id not in sessions_data:
+                    # Try to get session title from metadata
+                    session_title = "Untitled Session"
+                    try:
+                        meta_data = json.loads(metadata.get('metadata', '{}'))
+                        if meta_data.get('is_session_metadata'):
+                            session_title = meta_data.get('session_title', session_title)
+                    except (json.JSONDecodeError, AttributeError):
+                        pass
+                    
                     sessions_data[session_id] = {
                         'session_id': session_id,
+                        'title': session_title,
                         'turn_count': 0,
                         'first_message': '',
                         'last_message': '',
@@ -233,9 +313,14 @@ class ChatHistoryManager:
                         'doc_files_used': set()
                     }
                 
-                # Update session data
+                # Update session data (skip session metadata from turn count)
                 session_info = sessions_data[session_id]
-                session_info['turn_count'] += 1
+                try:
+                    meta_data = json.loads(metadata.get('metadata', '{}'))
+                    if not meta_data.get('is_session_metadata', False):
+                        session_info['turn_count'] += 1
+                except (json.JSONDecodeError, AttributeError):
+                    session_info['turn_count'] += 1
                 
                 # Track first and last messages
                 timestamp = metadata.get('timestamp', '')
