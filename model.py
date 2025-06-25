@@ -165,8 +165,13 @@ hf_token = os.getenv("HF_TOKEN", "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")
 HfFolder.save_token(hf_token)
 
 
+<<<<<<< HEAD
 hf_access_token = "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"
 login(token=hf_access_token)
+=======
+# hf_access_token = "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"
+# login(token=hf_access_token)
+>>>>>>> 2d9b07e (.)
 CUDA_VISIBLE_DEVICES = []
 for i in range(torch.cuda.device_count()):
     CUDA_VISIBLE_DEVICES.append(i)
@@ -668,6 +673,9 @@ class MyModel(AIxBlockMLBase):
             raw_input = kwargs.get("input", None)
             docchat_mode = kwargs.get("docchat", False)
             doc_files = kwargs.get("doc_files", None)
+            hf_access_token = kwargs.get("hf_access_token", "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")
+
+            login(token=hf_access_token)
             
             if raw_input:
                 input_datas = json.loads(raw_input)

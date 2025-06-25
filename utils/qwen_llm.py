@@ -4,34 +4,50 @@ import psutil
 import warnings
 
 class QwenLLM:
-    def __init__(self, model_name_or_path="Qwen/Qwen3-1.7B", device=None):
+    def __init__(self, model_name_or_path="Qwen/Qwen3-4B", device=None):
         # Kiểm tra RAM khả dụng
-        total_ram_gb = psutil.virtual_memory().total / (1024 ** 3)
-        if total_ram_gb < 8:
-            warnings.warn(f"Warning: Your system has only {total_ram_gb:.1f}GB RAM. Qwen3-1.7B may require at least 6-8GB RAM for inference.")
-        
+        print("load_check_point", model_name_or_path)
+        import gc
+        import torch
+
+        # 🧹 Giải phóng CUDA memory trước khi load
+        gc.collect()
+        # gc.collect()
+        # torch.cuda.empty_cache()
         if device is None:
             self.device = "cuda" if torch.cuda.is_available() else "cpu"
         else:
             self.device = device
+            
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.ipc_collect()
+        
 
-        # Tối ưu cho CPU: ép dtype float32, tắt fp16, không load quantized
-        if self.device == "cpu":
-            self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, trust_remote_code=True)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
+        if torch.cuda.is_available():
+            if torch.cuda.is_bf16_supported():
+                dtype = torch.bfloat16
+            else:
+                dtype = torch.float16
+
+            print("Using CUDA.")
+
+            # load the tokenizer and the model
             self.model = AutoModelForCausalLM.from_pretrained(
                 model_name_or_path,
-                trust_remote_code=True,
-                torch_dtype=torch.float32,
-                low_cpu_mem_usage=True
+                torch_dtype=dtype,
+                device_map="auto"
             )
         else:
-            self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, trust_remote_code=True)
+            print("Using CPU.")
             self.model = AutoModelForCausalLM.from_pretrained(
                 model_name_or_path,
-                trust_remote_code=True
+                torch_dtype=dtype,
+                device_map="cpu",
             )
-        self.model = self.model.to(self.device)
-        self.model.eval()
+        # self.model = self.model.to(self.device)
+        # self.model.eval()
 
     def generate(self, prompt, max_new_tokens=100, temperature=0.7):
         # Tăng max_new_tokens để đảm bảo response không bị cắt
