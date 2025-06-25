@@ -14,7 +14,7 @@ def docchat_answer(question: str, file_paths: List[str], model_name_or_path="Qwe
     """
     processor = DocumentProcessor()
     retriever_builder = RetrieverBuilder()
-    workflow = AgentWorkflow()
+    workflow = AgentWorkflow(model_name_or_path)
 
     # Prepare file-like objects for DocumentProcessor
     files = []
@@ -39,6 +39,7 @@ def docchat_answer(question: str, file_paths: List[str], model_name_or_path="Qwe
         print(f"question: {question}")
 
         result = workflow.full_pipeline(question=question, retriever=retriever)
+        print(f"result: {result}")
         return result["draft_answer"], result["verification_report"]
     except Exception as e:
         logger.error(f"DocChat processing error: {str(e)}")
