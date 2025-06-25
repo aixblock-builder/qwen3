@@ -710,13 +710,6 @@ class MyModel(AIxBlockMLBase):
                 return {"message": "predict completed successfully (docchat)", "result": predictions}
             # --- END DOCCHAT ---
 
-            from huggingface_hub import login
-
-            hf_access_token = kwargs.get(
-                "hf_access_token", "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"
-            )
-            # login(token=hf_access_token)
-
             def smart_pipeline(
                 model_id: str,
                 token: str,
@@ -902,7 +895,6 @@ class MyModel(AIxBlockMLBase):
         Project ID: {project_id}
         """
         )
-        from huggingface_hub import login
 
         hf_access_token = kwargs.get(
             "hf_access_token", "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"
