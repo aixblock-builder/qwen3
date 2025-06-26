@@ -18,10 +18,10 @@ class AgentState(TypedDict):
     retriever: EnsembleRetriever
 
 class AgentWorkflow:
-    def __init__(self, model_name_or_path="Qwen/Qwen3-1.7B"):
-        self.researcher = ResearchAgent(model_name_or_path=model_name_or_path)
-        self.verifier = VerificationAgent(model_name_or_path=model_name_or_path)
-        self.relevance_checker = RelevanceChecker(model_name_or_path=model_name_or_path)
+    def __init__(self, model_name_or_path="Qwen/Qwen3-1.7B", pipe=None, tokenizer=None):
+        self.researcher = ResearchAgent(model_name_or_path=model_name_or_path, pipe=pipe, tokenizer=tokenizer)
+        self.verifier = VerificationAgent(model_name_or_path=model_name_or_path, pipe=pipe, tokenizer=tokenizer)
+        self.relevance_checker = RelevanceChecker(model_name_or_path=model_name_or_path, pipe=pipe, tokenizer=tokenizer)
         self.compiled_workflow = self.build_workflow()  # Compile once during initialization
         
     def build_workflow(self):

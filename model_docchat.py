@@ -7,14 +7,14 @@ from utils.logging import logger
 
 # This function will be used by Qwen3 for docchat prediction and UI
 
-def docchat_answer(question: str, file_paths: List[str], model_name_or_path="Qwen/Qwen3-1.7B") -> Tuple[str, str]:
+def docchat_answer(question: str, file_paths: List[str], model_name_or_path="Qwen/Qwen3-1.7B", pipe=None, tokenizer=None) -> Tuple[str, str]:
     """
     Process the given files and question using the DocChat pipeline.
     Returns (answer, verification_report).
     """
     processor = DocumentProcessor()
     retriever_builder = RetrieverBuilder()
-    workflow = AgentWorkflow(model_name_or_path)
+    workflow = AgentWorkflow(model_name_or_path, pipe, tokenizer)
 
     # Prepare file-like objects for DocumentProcessor
     files = []

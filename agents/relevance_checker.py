@@ -4,8 +4,8 @@
 from utils.qwen_llm import QwenLLM
 
 class RelevanceChecker:
-    def __init__(self, model_name_or_path="Qwen/Qwen3-1.7B"):
-        self.llm = QwenLLM(model_name_or_path)
+    def __init__(self, model_name_or_path="Qwen/Qwen3-1.7B", pipe=None, tokenizer=None):
+        self.llm = QwenLLM(model_name_or_path=model_name_or_path, pipe=pipe, tokenizer=tokenizer)
         self.prompt_template = (
             "You are a document analysis assistant. Classify how well the given passages address the user's question.\n\n"
             "CLASSIFICATION OPTIONS:\n"

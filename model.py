@@ -712,77 +712,16 @@ class MyModel(AIxBlockMLBase):
             history_has_docs = False
             history_doc_files = []
             if conversation_history:
-                for turn in conversation_history[-5:]:  # Check last 3 turns
+                # Duyệt ngược từ lượt nói mới nhất
+                for turn in reversed(conversation_history):  
                     turn_doc_files = turn.get('doc_files', [])
-                    if turn_doc_files and len(turn_doc_files) > 0:
-                        history_has_docs = True
-                        # Collect all unique doc files from history
-                        for doc_file in turn_doc_files:
-                            if doc_file and doc_file not in history_doc_files:
-                                history_doc_files.append(doc_file)
-                        print(f"📄 Found doc_files in conversation history: {turn_doc_files}")
-
-            # --- DOCCHAT INTEGRATION ---
-            if docchat_mode or doc_files or history_has_docs:
-                # doc_files should be a list of file paths
-                if not doc_files:
-                    doc_files = []
-                if isinstance(doc_files, str):
-                    # If passed as a comma-separated string
-                    doc_files = [f.strip() for f in doc_files.split(",") if f.strip()]
-                
-                # If no current doc_files but history has docs, use history docs
-                if not doc_files and history_has_docs:
-                    doc_files = history_doc_files
-                    print(f"🔄 Using doc_files from conversation history: {doc_files}")
-                
-                # Add conversation history to the prompt if available
-                enhanced_prompt = prompt
-                if conversation_history:
-                    history_context = chat_history.format_history_for_context(conversation_history, max_turns=3)
-                    enhanced_prompt = f"{history_context}\n\nCurrent Question: {prompt}"
-                    print(f"🔄 Using conversation history for session {session_id}")
-                
-                # answer, verification = "test", "test"
-                
-                answer, verification = docchat_answer(enhanced_prompt, doc_files)
-                predictions.append({
-                    "result": [
-                        {
-                            "from_name": "generated_text",
-                            "to_name": "text_output",
-                            "type": "textarea",
-                            "value": {
-                                "text": [answer],
-                                "verification": [verification]
-                            },
-                        }
-                    ],
-                    "model_version": "docchat"
-                })
-                
-                # 💾 Save conversation to history (DocChat mode)
-                if use_history and original_prompt and answer:
-                    try:
-                        # Determine mode based on source of doc_files
-                        if history_has_docs and not docchat_mode and not kwargs.get("doc_files"):
-                            mode = "docchat_from_history"
-                        else:
-                            mode = "docchat"
-                        
-                        chat_history.save_conversation_turn(
-                            session_id=session_id,
-                            user_message=original_prompt,
-                            bot_response=answer,
-                            doc_files=doc_files,
-                            metadata={"command": "predict", "mode": mode, "model_id": model_id, "history_docs_used": history_has_docs}
-                        )
-                        print(f"💾 Saved DocChat conversation to session {session_id} (mode: {mode})")
-                    except Exception as e:
-                        print(f"❌ Failed to save DocChat conversation: {e}")
-                
-                return {"message": "predict completed successfully (docchat)", "result": predictions, "session_id": session_id}
-            # --- END DOCCHAT ---
+                    if turn_doc_files:
+                        latest_file = turn_doc_files[-1]  # Lấy file cuối cùng trong lượt nói
+                        if latest_file:
+                            history_has_docs = True
+                            history_doc_files = [latest_file]  # Ghi đè để chỉ giữ file mới nhất
+                            print(f"📄 Found latest doc_file in conversation history: {latest_file}")
+                            break
 
             def smart_pipeline(
                 model_id: str,
@@ -839,6 +778,73 @@ class MyModel(AIxBlockMLBase):
                 # Load the model
                 if not pipe_prediction or model_predict != model_id:
                     smart_pipeline(model_id, hf_access_token)
+
+                # --- DOCCHAT INTEGRATION ---
+                if docchat_mode or doc_files or history_has_docs:
+                    # doc_files should be a list of file paths
+                    if not doc_files:
+                        doc_files = []
+                    if isinstance(doc_files, str):
+                        # If passed as a comma-separated string
+                        doc_files = [f.strip() for f in doc_files.split(",") if f.strip()]
+                    
+                    # If no current doc_files but history has docs, use history docs
+                    if not doc_files and history_has_docs:
+                        doc_files = history_doc_files
+                        print(f"🔄 Using doc_files from conversation history: {doc_files}")
+                    
+                    # Add conversation history to the prompt if available
+                    enhanced_prompt = prompt
+                    if conversation_history and not docchat_mode:
+                        history_context = chat_history.format_history_for_context(conversation_history, max_turns=3)
+                        enhanced_prompt = f"{history_context}\n\nCurrent Question: {prompt}"
+                        print(f"🔄 Using conversation history for session {session_id}")
+                    
+                    answer, verification = "test", "test"
+                    
+                    print("enhanced_prompt", enhanced_prompt)
+                    print("doc_files", doc_files)
+                    print("model_id", model_id)
+
+                    answer, verification = docchat_answer(enhanced_prompt, doc_files, model_id, pipe_prediction, tokenizer)
+                    if verification != "" or docchat_mode:
+                        predictions.append({
+                            "result": [
+                                {
+                                    "from_name": "generated_text",
+                                    "to_name": "text_output",
+                                    "type": "textarea",
+                                    "value": {
+                                        "text": [answer],
+                                        "thinking": [verification]
+                                    },
+                                }
+                            ],
+                            "model_version": "docchat"
+                        })
+                        
+                        # 💾 Save conversation to history (DocChat mode)
+                        if use_history and original_prompt and answer:
+                            try:
+                                # Determine mode based on source of doc_files
+                                if history_has_docs and not docchat_mode and not kwargs.get("doc_files"):
+                                    mode = "docchat_from_history"
+                                else:
+                                    mode = "docchat"
+                                
+                                chat_history.save_conversation_turn(
+                                    session_id=session_id,
+                                    user_message=original_prompt,
+                                    bot_response=answer,
+                                    doc_files=doc_files,
+                                    metadata={"command": "predict", "mode": mode, "model_id": model_id, "history_docs_used": history_has_docs}
+                                )
+                                print(f"💾 Saved DocChat conversation to session {session_id} (mode: {mode})")
+                            except Exception as e:
+                                print(f"❌ Failed to save DocChat conversation: {e}")
+                        
+                        return {"message": "predict completed successfully (docchat)", "result": predictions, "session_id": session_id}
+                # --- END DOCCHAT ---
 
                 # Prepare messages with conversation history
                 messages = []
@@ -906,7 +912,7 @@ class MyModel(AIxBlockMLBase):
                         session_id=session_id,
                         user_message=original_prompt,
                         bot_response=generated_text,
-                        doc_files=doc_files,
+                        doc_files=[],
                         metadata={"command": "predict", "mode": "normal", "model_id": model_id, "thinking": thinking_content}
                     )
                     print(f"💾 Saved normal conversation to session {session_id}")

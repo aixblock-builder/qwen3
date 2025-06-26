@@ -9,9 +9,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 class ResearchAgent:
-    def __init__(self, model_name_or_path="Qwen/Qwen3-1.7B"):
+    def __init__(self, model_name_or_path="Qwen/Qwen3-1.7B", pipe=None, tokenizer=None):
         """Initialize the research agent with the OpenAI model."""
-        self.llm = QwenLLM(model_name_or_path=model_name_or_path)
+        self.llm = QwenLLM(model_name_or_path=model_name_or_path, pipe=pipe, tokenizer=tokenizer)
         self.prompt_template = (
             "You are a helpful assistant. Answer the question based on the provided context.\n\n"
             "Instructions:\n"

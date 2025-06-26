@@ -113,15 +113,15 @@ async def action(request: ActionRequest = Body(...)):
                         bot_response = value["text"][0] if value["text"] else ""
             
             print(bot_response)
-            if user_prompt and bot_response:
-                doc_files_used = parsed_params.get("doc_files", [])
-                chat_history.save_conversation_turn(
-                    session_id=session_id,
-                    user_message=user_prompt,
-                    bot_response=bot_response,
-                    doc_files=doc_files_used,
-                    metadata={"command": request.command}
-                )
+            # if user_prompt and bot_response:
+            #     doc_files_used = parsed_params.get("doc_files", [])
+            #     chat_history.save_conversation_turn(
+            #         session_id=session_id,
+            #         user_message=user_prompt,
+            #         bot_response=bot_response,
+            #         doc_files=doc_files_used,
+            #         metadata={"command": request.command}
+            #     )
 
         # Add session_id to response
         result["session_id"] = session_id
