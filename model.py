@@ -688,7 +688,7 @@ class MyModel(AIxBlockMLBase):
             
             # Load conversation history if enabled
             if use_history and not conversation_history:  # Only load if not already provided
-                conversation_history = chat_history.get_session_history(session_id, limit=5)
+                conversation_history = chat_history.get_session_history(session_id, limit=10)
                 if conversation_history:
                     print(f"📚 Loaded {len(conversation_history)} previous conversations for session {session_id}")
                 else:
@@ -708,14 +708,33 @@ class MyModel(AIxBlockMLBase):
             if not prompt or prompt == "":
                 prompt = text
 
+            # Check if any recent conversation history has doc_files
+            history_has_docs = False
+            history_doc_files = []
+            if conversation_history:
+                for turn in conversation_history[-5:]:  # Check last 3 turns
+                    turn_doc_files = turn.get('doc_files', [])
+                    if turn_doc_files and len(turn_doc_files) > 0:
+                        history_has_docs = True
+                        # Collect all unique doc files from history
+                        for doc_file in turn_doc_files:
+                            if doc_file and doc_file not in history_doc_files:
+                                history_doc_files.append(doc_file)
+                        print(f"📄 Found doc_files in conversation history: {turn_doc_files}")
+
             # --- DOCCHAT INTEGRATION ---
-            if docchat_mode or doc_files:
+            if docchat_mode or doc_files or history_has_docs:
                 # doc_files should be a list of file paths
                 if not doc_files:
                     doc_files = []
                 if isinstance(doc_files, str):
                     # If passed as a comma-separated string
                     doc_files = [f.strip() for f in doc_files.split(",") if f.strip()]
+                
+                # If no current doc_files but history has docs, use history docs
+                if not doc_files and history_has_docs:
+                    doc_files = history_doc_files
+                    print(f"🔄 Using doc_files from conversation history: {doc_files}")
                 
                 # Add conversation history to the prompt if available
                 enhanced_prompt = prompt
@@ -745,14 +764,20 @@ class MyModel(AIxBlockMLBase):
                 # 💾 Save conversation to history (DocChat mode)
                 if use_history and original_prompt and answer:
                     try:
+                        # Determine mode based on source of doc_files
+                        if history_has_docs and not docchat_mode and not kwargs.get("doc_files"):
+                            mode = "docchat_from_history"
+                        else:
+                            mode = "docchat"
+                        
                         chat_history.save_conversation_turn(
                             session_id=session_id,
                             user_message=original_prompt,
                             bot_response=answer,
                             doc_files=doc_files,
-                            metadata={"command": "predict", "mode": "docchat", "model_id": model_id}
+                            metadata={"command": "predict", "mode": mode, "model_id": model_id, "history_docs_used": history_has_docs}
                         )
-                        print(f"💾 Saved DocChat conversation to session {session_id}")
+                        print(f"💾 Saved DocChat conversation to session {session_id} (mode: {mode})")
                     except Exception as e:
                         print(f"❌ Failed to save DocChat conversation: {e}")
                 
