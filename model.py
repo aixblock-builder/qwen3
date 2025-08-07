@@ -674,7 +674,7 @@ class MyModel(AIxBlockMLBase):
             conversation_history = kwargs.get("conversation_history", [])
             session_id = kwargs.get("session_id", None)
             use_history = kwargs.get("use_history", True)
-            hf_access_token = kwargs.get("push_to_hub_token", "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")
+            hf_access_token = kwargs.get("push_to_hub_token", "")
 
             # 🧠 CHAT HISTORY MANAGEMENT
             from utils.chat_history import ChatHistoryManager
@@ -697,7 +697,8 @@ class MyModel(AIxBlockMLBase):
             # Store original prompt for saving later
             original_prompt = prompt or text
 
-            login(token=hf_access_token)
+            if hf_access_token:
+                login(token=hf_access_token)
             
             if raw_input:
                 input_datas = json.loads(raw_input)
