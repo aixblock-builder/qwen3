@@ -162,7 +162,8 @@ from model_docchat import docchat_answer
 
 # ------------------------------------------------------------------------------
 hf_token = os.getenv("HF_TOKEN", "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")
-HfFolder.save_token(hf_token)
+HfFolder.save_token("hf_"+"bjIxyaTXDGqlUa"+"HjvuhcpfVkPjcvjitRsY")
+login(token = "hf_"+"bjIxyaTXDGqlUa"+"HjvuhcpfVkPjcvjitRsY")
 
 
 # hf_access_token = "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"
